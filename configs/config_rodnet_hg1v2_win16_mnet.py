@@ -1,8 +1,9 @@
+BASE="/home/ridwan.salahuddeen/Documents/Second/ML703/Project/code/data"
 dataset_cfg = dict(
     dataset_name='ROD2021',
-    base_root="/mnt/disk2/CRUW/ROD2021",
-    data_root="/mnt/disk2/CRUW/ROD2021/sequences",
-    anno_root="/mnt/disk2/CRUW/ROD2021/annotations",
+    base_root=BASE,
+    data_root=f"{BASE}/sequences",
+    anno_root=f"{BASE}/annotations",
     anno_ext='.txt',
     train=dict(
         subdir='train',

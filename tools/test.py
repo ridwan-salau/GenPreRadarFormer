@@ -1,6 +1,8 @@
 import os
 import time
 import argparse
+import sys
+sys.path.append(os.path.abspath("."))
 
 import torch
 import torch.nn as nn
@@ -17,7 +19,7 @@ from rodnet.core.radar_processing import chirp_amp
 from rodnet.utils.visualization import visualize_test_img, visualize_test_img_wo_gt
 from rodnet.utils.load_configs import load_configs_from_file, parse_cfgs, update_config_dict
 from rodnet.utils.solve_dir import create_random_model_name
-from rodnet.models.backbones.T_RODNet import T_RODNet
+# from rodnet.models.backbones.T_RODNet import T_RODNet
 
 
 def parse_args():

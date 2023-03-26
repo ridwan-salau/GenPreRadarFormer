@@ -5,6 +5,7 @@ import numpy as np
 import json
 import pickle
 import argparse
+sys.path.append(os.path.abspath("."))
 
 from cruw import CRUW
 from cruw.annotation.init_json import init_meta_json
@@ -218,10 +219,9 @@ if __name__ == "__main__":
     out_data_dir = args.out_data_dir
     os.makedirs(out_data_dir, exist_ok=True)
     overwrite = args.overwrite
-
-    dataset = CRUW(data_root=data_root, sensor_config_name=args.sensor_config)
     config_dict = load_configs_from_file(args.config)
     config_dict = update_config_dict(config_dict, args)  # update configs by args
+    dataset = CRUW(data_root=config_dict["dataset_cfg"]["data_root"], sensor_config_name=args.sensor_config)
     radar_configs = dataset.sensor_cfg.radar_cfg
 
     if splits == None:
