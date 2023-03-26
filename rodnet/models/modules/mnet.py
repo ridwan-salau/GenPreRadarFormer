@@ -25,7 +25,7 @@ class MNet(nn.Module):
             x_win = self.t_maxpool(x_win)
             x_win = x_win.view(batch_size, self.out_channels, w, h)
             x_out[:, :, win, ] = x_win
-        return x_out
+        return x_out.bfloat16()
 
 
 if __name__ == '__main__':

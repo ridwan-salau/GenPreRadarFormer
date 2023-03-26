@@ -25,8 +25,8 @@ def one_hot_embedding(labels, num_classes):
 #         pred (batch x c x h x w)
 #         gt_regr (batch x c x h x w)
 #     '''
-#     pos_inds = gt.eq(1).float()
-#     neg_inds = gt.lt(1).float()
+#     pos_inds = gt.eq(1).bfloat16()
+#     neg_inds = gt.lt(1).bfloat16()
 #
 #     neg_weights = torch.pow(1 - gt, 4)
 #
@@ -35,7 +35,7 @@ def one_hot_embedding(labels, num_classes):
 #     pos_loss = torch.log(pred) * torch.pow(1 - pred, 2) * pos_inds
 #     neg_loss = torch.log(1 - pred) * torch.pow(pred, 2) * neg_weights * neg_inds
 #
-#     num_pos = pos_inds.float().sum()
+#     num_pos = pos_inds.bfloat16().sum()
 #     pos_loss = pos_loss.sum()
 #     neg_loss = neg_loss.sum()
 #

@@ -391,6 +391,7 @@ if __name__ == "__main__":
     print("Number of iterations in each epoch: %d" % int(len(crdata_train) / batch_size))
     print('optimizer currently is: ',optimizer)
     print('Number of trainable parameters: %s' % str(count_params(rodnet)))
+    rodnet.bfloat16().cuda()
 
     start_time = time.time()
     
@@ -416,22 +417,22 @@ if __name__ == "__main__":
 
             tic = time.time()
             optimizer.zero_grad()  # zero the parameter gradients
-            confmap_preds = rodnet(data.float().cuda())
+            confmap_preds = rodnet(data.cuda().bfloat16())
 
             loss_confmap = 0
             if stacked_num is not None:
                 if stacked_num != 1:
                     for i in range(stacked_num):
-                        loss_cur = criterion(confmap_preds[i], confmap_gt.float().cuda())
+                        loss_cur = criterion(confmap_preds[i], confmap_gt.bfloat16().cuda())
                         loss_confmap += loss_cur
                     loss_confmap.backward()
                     optimizer.step()
                 else:
-                    loss_confmap = criterion(confmap_preds, confmap_gt.float().cuda())
+                    loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda())
                     loss_confmap.backward()
                     optimizer.step()
             else:
-                loss_confmap = criterion(confmap_preds, confmap_gt.float().cuda())
+                loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda())
                 loss_confmap.backward()
                 optimizer.step()
             tic_back = time.time()
@@ -530,8 +531,8 @@ if __name__ == "__main__":
                 data = data_dict['radar_data']
                 confmap_gt = data_dict['anno']['confmaps']  
                 image_paths = data_dict['image_paths']
-                valid_confmap_preds = rodnet(data.float().cuda())
-                valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.float().cuda())
+                valid_confmap_preds = rodnet(data.bfloat16().cuda())
+                valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.bfloat16().cuda())
                 valid_loss_ave = np.average([valid_loss_ave, valid_loss_confmap.item()], weights=[iter, 1])
                 
                 if iter % config_dict['train_cfg']['log_step'] == 0:
