@@ -1,11 +1,8 @@
 import torch
 import torch.nn as nn
-from monai.networks.blocks import UnetrBasicBlock, UnetrPrUpBlock, UnetrUpBlock
-from monai.networks.blocks.dynunet_block import UnetOutBlock
-from monai.networks.nets import ViT
 
 from .backbones.MaxVIT2 import RadarStackedHourglass
-from .modules.mnet import MNet
+from .modules.mnet import MNet, MNetPlus
 
 
 
@@ -22,18 +19,20 @@ class MaxVIT2(nn.Module):
                 patch_size = 8, 
                 hidden_size = 516, 
                 receptive_field = [[3,3,3,3],[3,3,3,3]],
-                num_layers = 12):
+                num_layers = 12,
+                mnet_plus_out_channels = None):
         super(MaxVIT2, self).__init__()
-        self.dcn = dcn
-        if dcn:
-            self.conv_op = DeformConvPack3D
-        else:
-            self.conv_op = nn.Conv3d
+        self.conv_op = nn.Conv3d
         if mnet_cfg is not None:
             in_chirps_mnet, out_channels_mnet = mnet_cfg
-            self.mnet = MNet(in_chirps_mnet, out_channels_mnet, conv_op=self.conv_op)
+            if mnet_plus_out_channels:
+                in_channels = mnet_plus_out_channels
+                self.mnet = MNetPlus(in_chirps_mnet, out_channels_mnet, win_size=win_size)
+            else:
+                in_channels = out_channels_mnet
+                self.mnet = MNet(in_chirps_mnet, out_channels_mnet, conv_op=self.conv_op)
             self.with_mnet = True
-            self.stacked_hourglass = RadarStackedHourglass(out_channels_mnet, n_class, stacked_num=stacked_num,
+            self.stacked_hourglass = RadarStackedHourglass(in_channels, n_class, stacked_num=stacked_num,
                                                 win_size = win_size, patch_size = patch_size, hidden_size = hidden_size,
                                                 num_layers = num_layers, receptive_field = receptive_field,
                                                 out_head = out_head)

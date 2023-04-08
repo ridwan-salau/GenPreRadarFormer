@@ -95,13 +95,13 @@ if __name__ == "__main__":
                             '2019_04_30_PCMS001.pkl', '2019_05_29_BCMS000.pkl', '2019_05_29_MLMS006.pkl', '2019_05_09_PCMS002.pkl', '2019_04_09_PMS3000.pkl', '2019_09_29_ONRD005.pkl', 
                             '2019_05_09_BM1S008.pkl', '2019_05_29_PBMS007.pkl', '2019_04_09_BMS1002.pkl', '2019_05_09_CM1S004.pkl', '2019_09_29_ONRD011.pkl', '2019_04_09_BMS1001.pkl']
     
-        train_subset = [x for x in list_train if x not in valid_subset]
+        train_subset = [x for x in list_train if x not in set(valid_subset)]
 
         print('Validation split is: %2d' %(len(valid_subset)))
         print('Train split is: %2d' %(len(train_subset)))
     else:
         print('all data will be used for training')
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
     # dataset = CRUW(data_root=config_dict['dataset_cfg']['base_root'])
     dataset = CRUW(data_root=config_dict['dataset_cfg']['base_root'], sensor_config_name=args.sensor_config)
     radar_configs = dataset.sensor_cfg.radar_cfg
@@ -207,7 +207,7 @@ if __name__ == "__main__":
                                     noise_channel=args.use_noise_channel, testing_state=0)
             seq_names = crdata_train.seq_names
             index_mapping = crdata_train.index_mapping
-            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=0, collate_fn=cr_collate)            
+            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=20, collate_fn=cr_collate)            
         # crdata_valid = CRDataset(os.path.join(args.data_dir, 'data_details'),
         #                          os.path.join(args.data_dir, 'confmaps_gt'),
         #                          win_size=win_size, set_type='valid', stride=8)
@@ -336,7 +336,8 @@ if __name__ == "__main__":
                         hidden_size = config_dict['model_cfg']['hidden_size'], 
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         out_head = config_dict['model_cfg']['out_head'],
-                        num_layers = config_dict['model_cfg']['num_layers']).cuda()
+                        num_layers = config_dict['model_cfg']['num_layers'],
+                        mnet_plus_out_channels=None).cuda()
         criterion = nn.BCELoss()
     else:
         raise TypeError
@@ -417,22 +418,22 @@ if __name__ == "__main__":
 
             tic = time.time()
             optimizer.zero_grad()  # zero the parameter gradients
-            confmap_preds = rodnet(data.cuda().bfloat16())
+            confmap_preds = rodnet(data.cuda(non_blocking=True).bfloat16())
 
             loss_confmap = 0
             if stacked_num is not None:
                 if stacked_num != 1:
                     for i in range(stacked_num):
-                        loss_cur = criterion(confmap_preds[i], confmap_gt.bfloat16().cuda())
+                        loss_cur = criterion(confmap_preds[i], confmap_gt.bfloat16().cuda(non_blocking=True))
                         loss_confmap += loss_cur
                     loss_confmap.backward()
                     optimizer.step()
                 else:
-                    loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda())
+                    loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda(non_blocking=True))
                     loss_confmap.backward()
                     optimizer.step()
             else:
-                loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda())
+                loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda(non_blocking=True))
                 loss_confmap.backward()
                 optimizer.step()
             tic_back = time.time()
@@ -531,8 +532,8 @@ if __name__ == "__main__":
                 data = data_dict['radar_data']
                 confmap_gt = data_dict['anno']['confmaps']  
                 image_paths = data_dict['image_paths']
-                valid_confmap_preds = rodnet(data.bfloat16().cuda())
-                valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.bfloat16().cuda())
+                valid_confmap_preds = rodnet(data.bfloat16().cuda(non_blocking=True))
+                valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.bfloat16().cuda(non_blocking=True))
                 valid_loss_ave = np.average([valid_loss_ave, valid_loss_confmap.item()], weights=[iter, 1])
                 
                 if iter % config_dict['train_cfg']['log_step'] == 0:
