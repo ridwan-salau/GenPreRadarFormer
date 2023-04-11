@@ -380,6 +380,7 @@ if __name__ == "__main__":
         load_tic = time.time()
         for iter, data_dict in enumerate(dataloader):
             load_time = time.time() - load_tic
+            if not data_dict['status']: continue
             data = data_dict['radar_data']
             try:
                 image_paths = data_dict['image_paths'][0]
