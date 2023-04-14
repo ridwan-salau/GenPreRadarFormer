@@ -21,7 +21,7 @@ if __name__ == "__main__":
                 '2019_05_28_PM2S012', '2019_05_28_PM2S014', '2019_09_18_ONRD004', '2019_09_18_ONRD009',
                 '2019_09_29_ONRD012', '2019_10_13_ONRD048']
 
-    dataset = CRUW(data_root='/mnt/disk1/CRUW')
+    dataset = CRUW(data_root='./data/')
 
     seq_names = os.listdir(rodnet_res_dir)
     if not os.path.exists(convert_res_dir):

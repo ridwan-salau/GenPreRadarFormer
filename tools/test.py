@@ -142,42 +142,42 @@ if __name__ == "__main__":
 
     print("Building model ... (%s)" % model_cfg)
     if model_cfg['type'] == 'CDC':
-        rodnet = RODNet(in_channels=2, n_class=n_class_test).cuda()
+        rodnet = RODNet(in_channels=2, n_class=n_class_test).cuda(1)
     elif model_cfg['type'] == 'HG':
-        rodnet = RODNet(in_channels=2, n_class=n_class_test, stacked_num=stacked_num).cuda()
+        rodnet = RODNet(in_channels=2, n_class=n_class_test, stacked_num=stacked_num).cuda(1)
     elif model_cfg['type'] == 'HGwI':
-        rodnet = RODNet(in_channels=2, n_class=n_class_test, stacked_num=stacked_num).cuda()
+        rodnet = RODNet(in_channels=2, n_class=n_class_test, stacked_num=stacked_num).cuda(1)
     elif model_cfg['type'] == 'CDCv2':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn']).cuda(1)
     elif model_cfg['type'] == 'HGv2':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn']).cuda(1)
     elif model_cfg['type'] == 'HGwIv2_2d':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
                         win_size=config_dict['train_cfg']['win_size'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn']).cuda(1)
     elif model_cfg['type'] == 'HGwIv2':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn']).cuda(1)
     elif model_cfg['type'] == 'HGwIv2_skipedit':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn']).cuda(1)
     elif model_cfg['type'] == 'HGwIv2_deform':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn']).cuda(1)
     elif model_cfg['type'] == 'unetr_v0' or model_cfg['type'] == 'unetr_v1':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
@@ -189,7 +189,7 @@ if __name__ == "__main__":
                         hidden_size = config_dict['model_cfg']['hidden_size'], 
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads']).cuda(1)
     elif model_cfg['type'] == 'unetr_res' or model_cfg['type'] == 'unetr_res_decomp':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
@@ -202,7 +202,7 @@ if __name__ == "__main__":
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads']).cuda(1)
     elif (model_cfg['type'] == 'unetr_2d' or model_cfg['type'] == 'unetr_2d_nores' 
     or model_cfg['type'] == 'unetr_2d_nups' or model_cfg['type'] == 'unetr_2d_interpolate' 
     or model_cfg['type'] == 'unetr_hourglass' or model_cfg['type'] == 'unetr_2d_res_nups'
@@ -218,7 +218,7 @@ if __name__ == "__main__":
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads']).cuda(1)
 
     elif model_cfg['type'] == 'unetr_2d_res_final' or model_cfg['type'] == 'unetr_2d_res_deform':
         in_chirps = len(radar_configs['chirp_ids'])
@@ -233,7 +233,7 @@ if __name__ == "__main__":
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         out_head = config_dict['model_cfg']['out_head'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads']).cuda(1)
 
     elif model_cfg['type'] == 'hrformer' or model_cfg['type'] == 'hrformer2d':     
         in_chirps = len(radar_configs['chirp_ids'])
@@ -248,7 +248,7 @@ if __name__ == "__main__":
                         channels_features = config_dict['model_cfg']['channels_features'],
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads']).cuda(1)
     elif model_cfg['type'] == 'unetr_2d_res':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
@@ -261,7 +261,7 @@ if __name__ == "__main__":
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads']).cuda(1)
     elif model_cfg['type'] == 'maxvit1' or model_cfg['type'] == 'maxvit2':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
@@ -272,7 +272,7 @@ if __name__ == "__main__":
                         hidden_size = config_dict['model_cfg']['hidden_size'], 
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         out_head = config_dict['model_cfg']['out_head'],
-                        num_layers = config_dict['model_cfg']['num_layers']).cuda()
+                        num_layers = config_dict['model_cfg']['num_layers']).cuda(1)
     elif model_cfg['type'] == 'maxvit1' or model_cfg['type'] == 'maxvit2' or model_cfg['type'] == 'Axial':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_test, stacked_num=stacked_num,
@@ -283,7 +283,7 @@ if __name__ == "__main__":
                         hidden_size = config_dict['model_cfg']['hidden_size'], 
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         out_head = config_dict['model_cfg']['out_head'],
-                        num_layers = config_dict['model_cfg']['num_layers']).cuda()
+                        num_layers = config_dict['model_cfg']['num_layers']).cuda(1)
         
     elif model_cfg['type'] == 'unetr_hilo':
         in_chirps = len(radar_configs['chirp_ids'])
@@ -300,14 +300,14 @@ if __name__ == "__main__":
                         alpha = config_dict['model_cfg']['alpha'],
                         hilo_ws = config_dict['model_cfg']['hilo_ws'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads']).cuda(1)
     elif model_cfg['model'] == 'T_RODNet':
         Cuda = True
         dice_loss = True
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
         NUM_CLASSES = 3
         inputs_size = [128, 128, 2]
-        rodnet = T_RODNet(num_classes=NUM_CLASSES, embed_dim=64, win_size=4).cuda()
+        rodnet = T_RODNet(num_classes=NUM_CLASSES, embed_dim=64, win_size=4).cuda(1)
         criterion = nn.MSELoss()
     else:
         raise TypeError
@@ -380,6 +380,7 @@ if __name__ == "__main__":
         load_tic = time.time()
         for iter, data_dict in enumerate(dataloader):
             load_time = time.time() - load_tic
+            if not data_dict['status']: continue
             data = data_dict['radar_data']
             try:
                 image_paths = data_dict['image_paths'][0]
@@ -400,7 +401,8 @@ if __name__ == "__main__":
             end_frame_id = data_dict['end_frame'].item()
 
             tic = time.time()
-            confmap_pred = rodnet(data.bfloat16().cuda())
+            rodnet.bfloat16()
+            confmap_pred = rodnet(data.bfloat16().cuda(1)).float()
             if stacked_num is not None:
                 if stacked_num != 1:
                     confmap_pred = confmap_pred[-1].cpu().detach().numpy()  # (1, 4, 32, 128, 128)
