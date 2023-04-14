@@ -185,7 +185,7 @@ class CRDataset(data.Dataset):
                 os.makedirs('./tmp')
             log_name = 'loadnpyfail-' + time.strftime("%Y%m%d-%H%M%S") + '.txt'
             with open(os.path.join('./tmp', log_name), 'w') as f_log:
-                f_log.write('npy path: ' + radar_paths[frameid][chirp_id] + \
+                f_log.write('npy path: ' + radar_paths[frameid] + \
                             '\nframe indices: %d:%d:%d' % (data_id, data_id + self.win_size * self.step, self.step))
             return data_dict
 
