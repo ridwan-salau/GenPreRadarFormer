@@ -401,8 +401,8 @@ if __name__ == "__main__":
             end_frame_id = data_dict['end_frame'].item()
 
             tic = time.time()
-            rodnet.bfloat16()
-            confmap_pred = rodnet(data.bfloat16().cuda(1)).float()
+            rodnet
+            confmap_pred = rodnet(data.cuda(1)).float()
             if stacked_num is not None:
                 if stacked_num != 1:
                     confmap_pred = confmap_pred[-1].cpu().detach().numpy()  # (1, 4, 32, 128, 128)

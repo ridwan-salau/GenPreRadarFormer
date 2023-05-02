@@ -1,6 +1,6 @@
 
 
-python ./tools/train.py \
+python -W ignore::UserWarning: ./tools/train.py \
 --config ./configs/MaxVIT2.py \
 --data_dir ./Pickle0 \
 --log_dir ./log/ \

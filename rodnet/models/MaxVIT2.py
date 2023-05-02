@@ -44,7 +44,11 @@ class MaxVIT2(nn.Module):
     def forward(self, x):
         if self.with_mnet:
             x = self.mnet(x)
+            # print("mnet:", torch.all(torch.isnan(x)))
+            # print("model/MaxVIT2.py mnet output shape:", x.shape)
         out = self.stacked_hourglass(x)
+        # print(torch.all(torch.isnan(out)))
+        # print("model/MaxVIT2 Final out:", out.shape)
         return out
 
 

@@ -396,11 +396,18 @@ class UNETR(nn.Module):
     #     return mem_info.free // 1024 ** 2
 
     def forward(self, x_input):
+        # print("backbone/MaxVIT2 input shape:", x_input.shape)
         x_in1 = self.relu(self.bn11(self.encoder11(x_input)))
+        # print("bn11enc11:", torch.all(torch.isnan(x_in1)))
+        # print("backbone/MaxVIT2 B11E11:", x_in1.shape)
         x_in2 = self.relu(self.bn12(self.encoder12(x_in1)))
+        # print("backbone/MaxVIT2 B12E12:", x_in2.shape)
         x_in3 = self.relu(self.bn13(self.encoder13(x_in2)))
+        # print("backbone/MaxVIT2 B13E13:", x_in3.shape)
         x_in = torch.squeeze(x_in3, dim = 2)
+        # print("backbone/MaxVIT2 SQZ:", x_in.shape)
         x = self.vit1(x_in)
+        # print("backbone/MaxVIT2 VIT1:", x.shape)
         # x1 = self.res1_decoder3(x)
         # x1 = self.res1_decoder4(x1 + x_in)
         # x = self.vit2(x1)
@@ -410,15 +417,23 @@ class UNETR(nn.Module):
         # x3 = self.res3_decoder3(x)
         # x3 = self.res3_decoder4(x2 + x3)
         # x = self.vit4(x3)
+        # print("vit:", torch.all(torch.isnan(x)))
         x4 = self.final_decoder1(x)
+        # print("backbone/MaxVIT2 BNCnv1:", x4.shape)
         x4 = self.final_decoder2(x4+x_in)
+        # print("backbone/MaxVIT2 BNCnv2:", x4.shape)
 
         x4 = torch.unsqueeze(x4,dim=2)
-        
+        # print("backbone/MaxVIT2 UNSQZ:", x_in.shape)
         x4 = self.relu(self.bn21(self.merge1(x4 + x_in3)))
+        # print("backbone/MaxVIT2 B21E21:", x4.shape)
         x4 = self.relu(self.bn22(self.merge2(x4 + x_in2)))
+        # print("bn22mer2:", torch.all(torch.isnan(x4)))
+        # print("backbone/MaxVIT2 B22E22:", x4.shape)
         x4 = self.relu(self.bn23(self.merge3(x4 + x_in1)))
+        # print("backbone/MaxVIT2 B23E23:", x4.shape)
         out = self.out(x4)
+        
         return out
 
 

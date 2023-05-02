@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import random
 import sys
+import itertools
 sys.path.append(os.path.abspath("."))
 
 import torch
@@ -16,6 +17,31 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader
+from torch.distributed.fsdp import (
+    FullyShardedDataParallel as FSDP,
+    MixedPrecision,
+    BackwardPrefetch,
+    ShardingStrategy,
+    CPUOffload,
+    FullStateDictConfig,
+    StateDictType,
+)
+from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
+    checkpoint_wrapper,
+    CheckpointImpl,
+#    apply_activation_checkpointing,
+)
+from torch.distributed.fsdp.wrap import (
+    size_based_auto_wrap_policy,
+    enable_wrap,
+    wrap,
+    transformer_auto_wrap_policy,
+)
 
 from cruw import CRUW
 
@@ -29,8 +55,22 @@ from rodnet.utils.solve_dir import create_dir_for_new_model
 from rodnet.utils.load_configs import load_configs_from_file, parse_cfgs, update_config_dict
 from rodnet.utils.visualization import visualize_train_img
 # from rodnet.models.backbones.T_RODNet import T_RODNet
+torch.__version__
+lead_device=0
 
+best_val_loss = float("inf")
 
+def setup(rank, world_size, port=None):
+    import random
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = port or "12356"
+
+    # initialize the process group
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+
+def cleanup():
+    dist.destroy_process_group()
+    
 def parse_args():
     parser = argparse.ArgumentParser(description='Train RODNet.')
 
@@ -54,8 +94,9 @@ def count_params(model):
     nb_params = sum([np.prod(p.size()) for p in model_parameters])
     return nb_params
 
+def fsdp_main(rank, world_size):
+    setup(rank, world_size, port="12355")
 
-if __name__ == "__main__":
     args = parse_args()
     config_dict = load_configs_from_file(args.config)
     config_dict = update_config_dict(config_dict, args)  # update configs by args
@@ -64,7 +105,6 @@ if __name__ == "__main__":
         vis_train = True
     else:
         vis_train = False
-    print(vis_train)
     validate = args.validate
     ### PRE-SHUFFLED PREVIOUSLY
     if validate is not None:
@@ -94,7 +134,7 @@ if __name__ == "__main__":
                             '2019_04_30_MLMS001.pkl', '2019_04_30_PM2S003.pkl', '2019_09_29_ONRD002.pkl', '2019_05_09_PBMS004.pkl', '2019_04_09_PMS2000.pkl', '2019_05_23_PM1S012.pkl', 
                             '2019_04_30_PCMS001.pkl', '2019_05_29_BCMS000.pkl', '2019_05_29_MLMS006.pkl', '2019_05_09_PCMS002.pkl', '2019_04_09_PMS3000.pkl', '2019_09_29_ONRD005.pkl', 
                             '2019_05_09_BM1S008.pkl', '2019_05_29_PBMS007.pkl', '2019_04_09_BMS1002.pkl', '2019_05_09_CM1S004.pkl', '2019_09_29_ONRD011.pkl', '2019_04_09_BMS1001.pkl']
-    
+
         train_subset = [x for x in list_train if x not in set(valid_subset)]
 
         print('Validation split is: %2d' %(len(valid_subset)))
@@ -188,39 +228,39 @@ if __name__ == "__main__":
     else:
         stacked_num = None
 
-    print("Building dataloader ... (Mode: %s)" % ("save_memory" if args.save_memory else "normal"))
-    
-    if not args.save_memory:
-        if validate is not None:
+    # print("Building dataloader ... (Mode: %s)" % ("save_memory" if args.save_memory else "normal"))
 
-            crdata_train = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
-                                    noise_channel=args.use_noise_channel, subset = train_subset, testing_state=0)
-            seq_names = crdata_train.seq_names
-            index_mapping = crdata_train.index_mapping
-            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=0, collate_fn=cr_collate)
+    # if not args.save_memory:
+    #     if validate is not None:
 
-            crdata_valid = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
-                                    noise_channel=args.use_noise_channel, subset = valid_subset, testing_state=0)
-            dataloader_valid = DataLoader(crdata_valid, batch_size, shuffle=False, num_workers=0, collate_fn=cr_collate)
-        else:
-            crdata_train = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
-                                    noise_channel=args.use_noise_channel, testing_state=0)
-            seq_names = crdata_train.seq_names
-            index_mapping = crdata_train.index_mapping
-            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=20, collate_fn=cr_collate)            
-        # crdata_valid = CRDataset(os.path.join(args.data_dir, 'data_details'),
-        #                          os.path.join(args.data_dir, 'confmaps_gt'),
-        #                          win_size=win_size, set_type='valid', stride=8)
-        # seq_names_valid = crdata_valid.seq_names
-        # index_mapping_valid = crdata_valid.index_mapping
-        # dataloader_valid = DataLoader(crdata_valid, batch_size=batch_size, shuffle=True, num_workers=0)
+    #         crdata_train = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
+    #                                 noise_channel=args.use_noise_channel, subset = train_subset[:2], testing_state=0)
+    #         seq_names = crdata_train.seq_names
+    #         index_mapping = crdata_train.index_mapping
+    #         dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=0, collate_fn=cr_collate)
 
-    else:
-        crdata_train = CRDatasetSM(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
-                                   noise_channel=args.use_noise_channel)
-        seq_names = crdata_train.seq_names
-        index_mapping = crdata_train.index_mapping
-        dataloader = CRDataLoader(crdata_train, shuffle=True, noise_channel=args.use_noise_channel)
+    #         crdata_valid = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
+    #                                 noise_channel=args.use_noise_channel, subset = valid_subset, testing_state=0)
+    #         dataloader_valid = DataLoader(crdata_valid, batch_size, shuffle=False, num_workers=0, collate_fn=cr_collate)
+    #     else:
+    #         crdata_train = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
+    #                                 noise_channel=args.use_noise_channel, testing_state=0)
+    #         seq_names = crdata_train.seq_names
+    #         index_mapping = crdata_train.index_mapping
+    #         dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=20, collate_fn=cr_collate)            
+    #     # crdata_valid = CRDataset(os.path.join(args.data_dir, 'data_details'),
+    #     #                          os.path.join(args.data_dir, 'confmaps_gt'),
+    #     #                          win_size=win_size, set_type='valid', stride=8)
+    #     # seq_names_valid = crdata_valid.seq_names
+    #     # index_mapping_valid = crdata_valid.index_mapping
+    #     # dataloader_valid = DataLoader(crdata_valid, batch_size=batch_size, shuffle=True, num_workers=0)
+
+    # else:
+    #     crdata_train = CRDatasetSM(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
+    #                                 noise_channel=args.use_noise_channel)
+    #     seq_names = crdata_train.seq_names
+    #     index_mapping = crdata_train.index_mapping
+    #     dataloader = CRDataLoader(crdata_train, shuffle=True, noise_channel=args.use_noise_channel)
 
         # crdata_valid = CRDatasetSM(os.path.join(args.data_dir, 'data_details'),
         #                          os.path.join(args.data_dir, 'confmaps_gt'),
@@ -234,40 +274,40 @@ if __name__ == "__main__":
     else:
         n_class_train = n_class
 
-    print("Building model ... (%s)" % model_cfg)
+    # print("Building model ... (%s)" % model_cfg)
     if model_cfg['type'] == 'CDC':
-        rodnet = RODNet(in_channels=2, n_class=n_class_train).cuda()
+        rodnet = RODNet(in_channels=2, n_class=n_class_train)
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'HG':
-        rodnet = RODNet(in_channels=2, n_class=n_class_train, stacked_num=stacked_num).cuda()
+        rodnet = RODNet(in_channels=2, n_class=n_class_train, stacked_num=stacked_num)
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'HGwI':
-        rodnet = RODNet(in_channels=2, n_class=n_class_train, stacked_num=stacked_num).cuda()
+        rodnet = RODNet(in_channels=2, n_class=n_class_train, stacked_num=stacked_num)
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'CDCv2':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_train,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn'])
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'HGv2':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_train, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn'])
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'HGwIv2':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_train, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn'])
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'HGwIv2_2d':
         in_chirps = len(radar_configs['chirp_ids'])
         rodnet = RODNet(in_channels=in_chirps, n_class=n_class_train, stacked_num=stacked_num,
                         mnet_cfg=config_dict['model_cfg']['mnet_cfg'],
                         win_size=config_dict['train_cfg']['win_size'],
-                        dcn=config_dict['model_cfg']['dcn']).cuda()
+                        dcn=config_dict['model_cfg']['dcn'])
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'unetr_v0' or model_cfg['type'] == 'unetr_v1':
         in_chirps = len(radar_configs['chirp_ids'])
@@ -280,7 +320,7 @@ if __name__ == "__main__":
                         hidden_size = config_dict['model_cfg']['hidden_size'], 
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads'])
         criterion = nn.BCELoss()
     elif (model_cfg['type'] == 'unetr_2d'):        
         in_chirps = len(radar_configs['chirp_ids'])
@@ -294,7 +334,7 @@ if __name__ == "__main__":
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads'])
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'hrformer2d':        
         in_chirps = len(radar_configs['chirp_ids'])
@@ -309,7 +349,7 @@ if __name__ == "__main__":
                         channels_features = config_dict['model_cfg']['channels_features'],
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads'])
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'unetr_2d_res_final':
         in_chirps = len(radar_configs['chirp_ids'])
@@ -324,7 +364,7 @@ if __name__ == "__main__":
                         mlp_dim = config_dict['model_cfg']['mlp_dim'],
                         out_head = config_dict['model_cfg']['out_head'],
                         num_layers = config_dict['model_cfg']['num_layers'], 
-                        num_heads = config_dict['model_cfg']['num_heads']).cuda()
+                        num_heads = config_dict['model_cfg']['num_heads'])
         criterion = nn.BCELoss()
     elif model_cfg['type'] == 'maxvit2':
         in_chirps = len(radar_configs['chirp_ids'])
@@ -337,7 +377,7 @@ if __name__ == "__main__":
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         out_head = config_dict['model_cfg']['out_head'],
                         num_layers = config_dict['model_cfg']['num_layers'],
-                        mnet_plus_out_channels=None).cuda()
+                        mnet_plus_out_channels=None)
         criterion = nn.BCELoss()
     else:
         raise TypeError
@@ -345,9 +385,9 @@ if __name__ == "__main__":
     if 'lr_type' in config_dict['train_cfg']:
         if config_dict['train_cfg']['lr_type'] == 'cosine':
             scheduler = CosineAnnealingLR(optimizer, 
-                                         T_max=config_dict['train_cfg']['t_max'],
-                                         eta_min = config_dict['train_cfg']['lr_min'], 
-                                         last_epoch = -1)
+                                            T_max=config_dict['train_cfg']['t_max'],
+                                            eta_min = config_dict['train_cfg']['lr_min'], 
+                                            last_epoch = -1)
             print('Scheduler: Cosine Annealing')
         else:
             print('Scheduler: Step')
@@ -355,14 +395,17 @@ if __name__ == "__main__":
     else:
         print('No scheduler specified, setting to: Step')
         scheduler = StepLR(optimizer, step_size=config_dict['train_cfg']['lr_step'], gamma=config_dict['train_cfg']['lr_factor'])
-    
+
     #scheduler = ReduceLROnPlateau(optimizer, mode = 'min', 
     #                             factor = 0.3, patience = 2, 
     #                             threshold = 1e-3, verbose = True)
-    print(rodnet)
+    # print(rodnet)
     iter_count = 0
     loss_ave = 0
     
+    
+    printing_flag = 0
+
     printing_flag = 0
     if cp_path is not None:
         checkpoint = torch.load(cp_path)
@@ -382,29 +425,83 @@ if __name__ == "__main__":
         del checkpoint
         for step in range((epoch_start-1)%config_dict['train_cfg']['lr_step']):
             scheduler.step()
-            print(step)
+            # print(step)
 
     # print training configurations
     print("Model name: %s" % model_name)
-    print("Number of sequences to train: %d" % crdata_train.n_seq)
-    print("Training dataset length: %d" % len(crdata_train))
+    # print("Number of sequences to train: %d" % crdata_train.n_seq)
+    # print("Training dataset length: %d" % len(crdata_train))
     print("Batch size: %d" % batch_size)
-    print("Number of iterations in each epoch: %d" % int(len(crdata_train) / batch_size))
-    print('optimizer currently is: ',optimizer)
+    # print("Number of iterations in each epoch: %d" % int(len(crdata_train) / batch_size))
+    # print('optimizer currently is: ',optimizer)
     print('Number of trainable parameters: %s' % str(count_params(rodnet)))
-    rodnet.bfloat16().cuda()
-
-    start_time = time.time()
+    rodnet
     
+    per_dev_batch_size = batch_size//world_size
+    per_dev_eval_batch_size = batch_size//world_size
+    if validate is not None:
+
+        crdata_train = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
+                                noise_channel=args.use_noise_channel, subset = train_subset, testing_state=0)
+        crdata_valid = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
+                                noise_channel=args.use_noise_channel, subset = valid_subset, testing_state=0)
+        
+        train_sampler = DistributedSampler(crdata_train, rank=rank, num_replicas=world_size, shuffle=True)
+        valid_sampler = DistributedSampler(crdata_valid, rank=rank, num_replicas=world_size, shuffle=False)
+    else:
+        crdata_train = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
+                                noise_channel=args.use_noise_channel, testing_state=0)
+        train_sampler = DistributedSampler(crdata_train, rank=rank, num_replicas=world_size, shuffle=True)
+    
+    
+    
+    train_kwargs = {'batch_size': per_dev_batch_size, 'sampler': train_sampler}
+    valid_kwargs = {'batch_size': per_dev_eval_batch_size, 'sampler': valid_sampler}
+    
+    cuda_kwargs = {'num_workers': 2,
+                    'pin_memory': True,
+                    'shuffle': False}
+    train_kwargs.update(cuda_kwargs)
+    valid_kwargs.update(cuda_kwargs)
+
+    train_loader = DataLoader(crdata_train,**train_kwargs, collate_fn=cr_collate)
+    valid_loader = DataLoader(crdata_valid, **valid_kwargs, collate_fn=cr_collate) if validate else None
+    
+    torch.cuda.set_device(rank)
+
+
+    # model = init_model(args).to(rank, )
+    bfSixteen = MixedPrecision(
+        param_dtype=torch.bfloat16,
+        # Gradient communication precision.
+        reduce_dtype=torch.bfloat16,
+        # Buffer precision.
+        buffer_dtype=torch.bfloat16,
+    )
+    model = FSDP(
+        rodnet,
+        device_id=torch.cuda.current_device(),
+        sharding_strategy=ShardingStrategy.SHARD_GRAD_OP,
+        # auto_wrap_policy=args.wrap_obj,
+        # mixed_precision=bfSixteen
+    )
+    
+    # train(model, rank, world_size, train_loader, valid_loader, criterion, epoch_start, n_epoch)
+
+
+# def train(rodnet, rank, world_size, dataloader, dataloader_valid, criterion, epoch_start, n_epoch):
+    start_time = time.time()
+    loss_ave = 0
+    iter_count = 0
+    printing_flag = 0
+    running_time=0
     for epoch in range(epoch_start, n_epoch):
-        print('Current optimizer is:',optimizer)
         tic_load = time.time()
         # if epoch == epoch_start:
         #     dataloader_start = iter_start
         # else:
         #     dataloader_start = 0
-        
-        for iter, data_dict in enumerate(dataloader):
+        for iter, data_dict in enumerate(train_loader):
 
             data = data_dict['radar_data']
             confmap_gt = data_dict['anno']['confmaps']
@@ -418,46 +515,48 @@ if __name__ == "__main__":
 
             tic = time.time()
             optimizer.zero_grad()  # zero the parameter gradients
-            confmap_preds = rodnet(data.cuda(non_blocking=True).bfloat16())
+            confmap_preds = model(data.to(rank, non_blocking=True))
 
             loss_confmap = 0
             if stacked_num is not None:
                 if stacked_num != 1:
                     for i in range(stacked_num):
-                        loss_cur = criterion(confmap_preds[i], confmap_gt.bfloat16().cuda(non_blocking=True))
+                        loss_cur = criterion(confmap_preds[i], confmap_gt.to(rank, non_blocking=True))
                         loss_confmap += loss_cur
                     loss_confmap.backward()
                     optimizer.step()
                 else:
-                    loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda(non_blocking=True))
+                    loss_confmap = criterion(confmap_preds, confmap_gt.to(rank, non_blocking=True).float())
                     loss_confmap.backward()
                     optimizer.step()
             else:
-                loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda(non_blocking=True))
+                loss_confmap = criterion(confmap_preds, confmap_gt.to(rank, non_blocking=True))
                 loss_confmap.backward()
                 optimizer.step()
             tic_back = time.time()
             if vis_train == False:
                 del confmap_preds
-            loss_ave = np.average([loss_ave, loss_confmap.item()], weights=[iter_count, 1])
+            
+            dist.all_reduce(loss_confmap, op=dist.ReduceOp.SUM)
+            loss_ave = np.average([loss_ave, loss_confmap.item()/world_size], weights=[iter_count, 1])
 
-            if iter % config_dict['train_cfg']['log_step'] == 0:
+            if iter % config_dict['train_cfg']['log_step'] == 0 and rank==0:
                 # print statistics
                 load_time = tic - tic_load
                 back_time = tic_back - tic
                 running_time = (tic_back - start_time)/3600
                 print('epoch %2d, iter %4d: loss: %.4f (%.4f) | load time: %.2f | back time: %.2f | total time: %.2f | LR: %.8f' %
-                     (epoch + 1, iter + 1, loss_confmap.item(), loss_ave, load_time, back_time, running_time, optimizer.param_groups[0]['lr']))
+                    (epoch + 1, iter + 1, loss_confmap.item(), loss_ave, load_time, back_time, running_time, optimizer.param_groups[0]['lr']))
 
                 with open(train_log_name, 'a+') as f_log:
                     if iter == 1 & printing_flag == 0:
                         printing_flag = 1
                         f_log.write("\nModel name: %s" % model_name)
-                        f_log.write('\nNumber of trainable parameters: %s' % str(count_params(rodnet)))
-                        f_log.write("\nNumber of sequences to train: %d" % crdata_train.n_seq)
-                        f_log.write("\nTraining dataset length: %d" % len(crdata_train))
+                        f_log.write('\nNumber of trainable parameters: %s' % str(count_params(model)))
+                        f_log.write("\nNumber of sequences to train: %d" % train_loader.dataset.n_seq)
+                        f_log.write("\nTraining dataset length: %d" % len(train_loader.dataset))
                         f_log.write("\nBatch size: %d" % batch_size)
-                        f_log.write("\nNumber of iterations in each epoch: %d\n" % int(len(crdata_train) / batch_size))
+                        f_log.write("\nNumber of iterations in each epoch: %d\n" % int(len(train_loader.dataset) / batch_size))
                     f_log.write('epoch %2d, iter %4d: loss: %.4f (%.4f) | load time: %.2f | back time: %.2f | total time: %.2f | LR: %.8f\n' %
                                     (epoch + 1, iter + 1, loss_confmap.item(), loss_ave, load_time, back_time, running_time, optimizer.param_groups[0]['lr']))
                 writer.add_scalar('loss/loss_all', loss_confmap.item(), iter_count)
@@ -471,25 +570,26 @@ if __name__ == "__main__":
 
                 # draw train images
                 
-            if (iter + 1) % config_dict['train_cfg']['save_step'] == 0:
+            if (iter + 1) % config_dict['train_cfg']['save_step'] == 0 and rank==0:
                 # validate current model
                 # print("validing current model ...")
                 # validate()
 
                 # save current model
                 print("saving current model ...")
+                dist.barrier()
                 status_dict = {
                     'model_name': model_name,
                     'epoch': epoch + 1,
                     'iter': iter + 1,
-                    'model_state_dict': rodnet.state_dict(),
+                    'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss_confmap.item(),
                     'loss_ave': loss_ave,
                     'iter_count': iter_count,
                 }
                 save_model_path = '%s/epoch_%02d_iter_%010d.pkl' % (model_dir, epoch + 1, iter_count + 1)
-                torch.save(status_dict, save_model_path)
+                if rank==0: torch.save(status_dict, save_model_path)
 
             iter_count += 1
             
@@ -501,6 +601,7 @@ if __name__ == "__main__":
 
         # save current model
         print("saving current epoch model ...")
+        dist.barrier()
         status_dict = {
             'model_name': model_name,
             'epoch': epoch,
@@ -512,36 +613,35 @@ if __name__ == "__main__":
             'iter_count': iter_count,
         }
         save_model_path = '%s/epoch_%02d_final.pkl' % (model_dir, epoch + 1)
-        torch.save(status_dict, save_model_path)
-        
-        
+        if rank==0: torch.save(status_dict, save_model_path)
+
         scheduler.step()
-        print('Current optimizer is: ', optimizer)
+        # print('Current optimizer is: ', optimizer)
 
         ############## VALIDATION STEP
         if validate is not None:
-            with open(train_log_name, 'a+') as f_log:
-                f_log.write("\n-----Validating-----")
-                f_log.write("\nNumber of sequences to validate: %d" % crdata_valid.n_seq)
-                f_log.write("\nValidating dataset length: %d" % len(crdata_valid))
-                f_log.write("\nBatch size: %d" % batch_size)
-                f_log.write("\nNumber of iterations in each epoch: %d" % int(len(crdata_valid) / batch_size))
+            model.eval()
+            if rank==0:
+                with open(train_log_name, 'a+') as f_log:
+                    f_log.write("\n-----Validating-----")
+                    f_log.write("\nNumber of sequences to validate: %d" % valid_loader.dataset.n_seq)
+                    f_log.write("\nValidating dataset length: %d" % len(valid_loader.dataset))
+                    f_log.write("\nBatch size: %d" % batch_size)
+                    f_log.write("\nNumber of iterations in each epoch: %d" % int(len(valid_loader.dataset) / batch_size))
             valid_loss_ave =0
-            for iter, data_dict in enumerate(dataloader_valid):
-                    
+            for iter, data_dict in enumerate(valid_loader):
                 data = data_dict['radar_data']
                 confmap_gt = data_dict['anno']['confmaps']  
                 image_paths = data_dict['image_paths']
-                valid_confmap_preds = rodnet(data.bfloat16().cuda(non_blocking=True))
-                valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.bfloat16().cuda(non_blocking=True))
+                valid_confmap_preds = model(data.to(rank, non_blocking=True))
+                valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.to(rank, non_blocking=True).float())
                 valid_loss_ave = np.average([valid_loss_ave, valid_loss_confmap.item()], weights=[iter, 1])
                 
-                if iter % config_dict['train_cfg']['log_step'] == 0:
+                if iter % config_dict['train_cfg']['log_step'] == 0 and rank==0:
                     # print statistics
                     print('\nepoch %2d, iter %4d: | valid_loss: %.4f (%.4f) | total time %.4f'
                         %(epoch +1, iter+1, valid_loss_confmap.item(),valid_loss_ave,running_time))
-                
-                if vis_train == True:
+                if vis_train == True and rank==0:
                     if stacked_num != 1:
                         confmap_pred = valid_confmap_preds[stacked_num - 1].cpu().detach().numpy()
                     else:
@@ -562,8 +662,39 @@ if __name__ == "__main__":
                 with open(train_log_name, 'a+') as f_log:
                     f_log.write('\nepoch %2d, iter %4d: | valid_loss: %.4f (%.4f) | total time %.4f'
                         %(epoch +1, iter+1, valid_loss_confmap.item(),valid_loss_ave,running_time))
-                    if iter == int(len(crdata_valid) / batch_size):
+                    if iter == int(len(valid_loader.dataset) / batch_size):
                         
                         f_log.write("\n-----End of Validation-----\n")
+            
+            model.train()
 
     print('Training Finished.')
+    cleanup()
+
+if __name__ == "__main__":
+    torch.cuda.manual_seed_all(0)
+    
+    WORLD_SIZE = torch.cuda.device_count()
+    print("WORLD_SIZE", WORLD_SIZE)
+
+    try:
+        mp.spawn(fsdp_main,
+            args=(WORLD_SIZE,),
+            nprocs=WORLD_SIZE,
+            join=True)
+    except Exception as e:
+        print(e)
+        print('-' * 100)
+        print('Exiting from training early')
+        
+        # nn.functional.binary_cross_entropy()
+        
+
+    # save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
+    # with FSDP.state_dict_type(
+    #             model, StateDictType.FULL_STATE_DICT, save_policy
+    #         ):
+    #             cpu_state = model.state_dict()
+    # if rank == 0:
+    # save_name = file_save_name + "-" + time_of_run + "-" + currEpoch
+    # torch.save(cpu_state, save_name)
