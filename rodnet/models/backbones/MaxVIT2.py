@@ -422,3 +422,5 @@ class UNETR(nn.Module):
         return out
 
 
+if __name__=="__main__":
+    unetr = UNETR()
