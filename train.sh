@@ -6,4 +6,4 @@ python ./tools/train.py \
 --log_dir ./log/ \
 --vis_train 0 \
 --validate 6
-
+--batch_size $1
