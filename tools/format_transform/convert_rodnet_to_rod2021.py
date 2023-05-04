@@ -16,7 +16,7 @@ if __name__ == "__main__":
     args = parse_args()
     rodnet_res_dir = args.result_dir
     convert_res_dir = args.final_dir
-
+    print(rodnet_res_dir)
     SEQ_NAMES = ['2019_05_28_CM1S013', '2019_05_28_MLMS005', '2019_05_28_PBMS006', '2019_05_28_PCMS004',
                 '2019_05_28_PM2S012', '2019_05_28_PM2S014', '2019_09_18_ONRD004', '2019_09_18_ONRD009',
                 '2019_09_29_ONRD012', '2019_10_13_ONRD048']

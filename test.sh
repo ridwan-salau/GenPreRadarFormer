@@ -11,12 +11,11 @@ python ./tools/test.py \
 
 
 
-
 python ./tools/format_transform/convert_rodnet_to_rod2021.py \
---result_dir ./"$run_folder"_$epoch/ \
---final_dir ./final_"$run_folder"_$epoch/ ;
+--result_dir ./results/${run_folder} \
+--final_dir ./final_${run_folder}_${epoch}/ ;
 
 
-cd ./final_"$run_folder"_$epoch/
+# cd ./final_${run_folder}_${epoch}/
 
-zip ./final_"$run_folder"_$epoch/result.zip *.txt
+python -c "import shutil;shutil.make_archive('./result', 'zip', './final_${run_folder}_${epoch}/')"
