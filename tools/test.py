@@ -365,13 +365,14 @@ if __name__ == "__main__":
             crdata_test = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='demo',
                                     noise_channel=args.use_noise_channel, subset=subset, is_random_chirp=False, testing_state=1)
         print("Length of testing data: %d" % len(crdata_test))
-        dataloader = DataLoader(crdata_test, batch_size=1, shuffle=False, num_workers=0, collate_fn=cr_collate)
+        dataloader = DataLoader(crdata_test, batch_size=1, shuffle=False, num_workers=6, collate_fn=cr_collate)
 
         seq_names = crdata_test.seq_names
         index_mapping = crdata_test.index_mapping
 
         init_genConfmap = ConfmapStack(confmap_shape)
         iter_ = init_genConfmap
+        rodnet.eval()
         for i in range(train_configs['win_size'] - 1):
             while iter_.next is not None:
                 iter_ = iter_.next
@@ -402,7 +403,8 @@ if __name__ == "__main__":
 
             tic = time.time()
             rodnet.bfloat16()
-            confmap_pred = rodnet(data.bfloat16().cuda()).float()
+            with torch.no_grad():
+                confmap_pred = rodnet(data.bfloat16().cuda()).float()
             if stacked_num is not None:
                 if stacked_num != 1:
                     confmap_pred = confmap_pred[-1].cpu().detach().numpy()  # (1, 4, 32, 128, 128)
