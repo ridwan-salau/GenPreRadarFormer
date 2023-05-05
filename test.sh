@@ -20,4 +20,4 @@ python ./tools/format_transform/convert_rodnet_to_rod2021.py \
 
 python -c "import shutil;shutil.make_archive('./final/${result_dir}', 'zip', './final/${result_dir}/')"
 
-python tools/eval.py  --res_dir results/${run_folder}/ --data_root ../data/ --gt_dir ../data/annotations/train/
+python tools/eval.py  --res_dir results/${run_folder}/ --data_root ../data/ --gt_dir ../data/annotations/train/ > ./final/${result_dir}/eval_result.txt
