@@ -536,7 +536,7 @@ if __name__ == "__main__":
                 image_paths = data_dict['image_paths']
                 with torch.no_grad():
                     valid_confmap_preds = rodnet(data.cuda(non_blocking=True))
-                    valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.cuda(non_blocking=True))
+                    valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.float().cuda(non_blocking=True))
                 valid_loss_ave = np.average([valid_loss_ave, valid_loss_confmap.item()], weights=[iter, 1])
                 
                 if iter % config_dict['train_cfg']['log_step'] == 0:

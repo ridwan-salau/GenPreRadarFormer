@@ -346,6 +346,7 @@ if __name__ == "__main__":
         seq_names = sorted(os.listdir(os.path.join(data_root, dataset_configs['demo']['subdir'])))
     print(seq_names)
     seq_names = [k.replace('.pkl','') for k in seq_names]
+    seq_names = ['2019_05_29_PM2S015', '2019_04_09_CMS1002', '2019_04_30_MLMS000', '2019_05_23_PM1S015', '2019_09_29_ONRD006', '2019_04_09_PMS1001']
     for seq_name in seq_names:
         seq_res_dir = os.path.join(test_res_dir, seq_name)
         if not os.path.exists(seq_res_dir):
@@ -359,7 +360,7 @@ if __name__ == "__main__":
     for subset in seq_names:
         print(subset)
         if not args.demo:
-            crdata_test = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='test',
+            crdata_test = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
                                     noise_channel=args.use_noise_channel, subset=subset, is_random_chirp=False, testing_state=1)
         else:
             crdata_test = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='demo',
