@@ -3,11 +3,11 @@ set -e
 run_folder=maxvit2_3579-20230505-032236
 epoch=30
 
-# python ./tools/test.py \
-# --config ./configs/MaxVIT2.py \
-# --data_dir ./Pickle0/ \
-# --checkpoint ./log/$run_folder/epoch_${epoch}_final.pkl \
-# --res_dir ./results/ ;
+python ./tools/test.py \
+--config ./configs/MaxVIT2.py \
+--data_dir ./Pickle0/ \
+--checkpoint ./log/$run_folder/epoch_${epoch}_final.pkl \
+--res_dir ./results/ ;
 
 
 result_dir=${run_folder}_${epoch}
