@@ -323,7 +323,7 @@ if __name__ == "__main__":
         model_name = create_random_model_name(model_cfg['name'], checkpoint_path)
     rodnet.eval()
 
-    test_res_dir = os.path.join(os.path.join(args.res_dir, model_name))
+    test_res_dir = os.path.join(os.path.join(args.res_dir, f"{model_name}_{checkpoint_path.split('_')[-2]}"))
     if not os.path.exists(test_res_dir):
         os.makedirs(test_res_dir)
 

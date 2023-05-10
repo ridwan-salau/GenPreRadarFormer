@@ -50,6 +50,7 @@ if __name__ == '__main__':
     h = 128
     out_channels = 32
     mnet = MNetPlus(in_chirps=in_chirps, out_channels=out_channels, win_size=win_size).cuda()
+    mnet = MNet(in_chirps=in_chirps, out_channels=out_channels).cuda()
     input = torch.randn(batch_size, in_channels, win_size, in_chirps, w, h).cuda()
     output = mnet(input)
     print(output.shape, output.device, output.dtype)

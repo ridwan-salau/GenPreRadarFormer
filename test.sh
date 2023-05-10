@@ -1,7 +1,8 @@
 set -e
 
-run_folder=maxvit2_3579-20230505-032236
-epoch=100
+run_test(){
+run_folder=maxvit2_3579-20230508-183845
+epoch=$1
 
 python ./tools/test.py \
 --config ./configs/MaxVIT2.py \
@@ -13,7 +14,7 @@ python ./tools/test.py \
 
 result_dir=${run_folder}_${epoch}
 python ./tools/format_transform/convert_rodnet_to_rod2021.py \
---result_dir ./results/${run_folder} \
+--result_dir ./results/${result_dir} \
 --final_dir ./final/${result_dir}/ ;
 
 
@@ -21,6 +22,11 @@ python ./tools/format_transform/convert_rodnet_to_rod2021.py \
 
 python -c "import shutil;shutil.make_archive('./final/${result_dir}', 'zip', './final/${result_dir}/')"
 
-python tools/eval.py  --res_dir results/${run_folder}/ --data_root ../data/ --gt_dir ../data/annotations/train/ > ./final/${result_dir}/eval_result.txt
+python tools/eval.py  --res_dir results/${result_dir}/ --data_root ../data/ --gt_dir ../data/annotations/train/ > ./final/${result_dir}/eval_result.txt
 
 echo Find the results here: ./final/${result_dir}/eval_result.txt
+}
+
+for epoch in {43..43..3}; do
+run_test $epoch &
+done

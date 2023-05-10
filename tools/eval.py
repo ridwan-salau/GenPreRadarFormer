@@ -34,7 +34,6 @@ if __name__ == '__main__':
     seq_names = sorted(os.listdir(args.res_dir))
     seq_names = [name for name in seq_names if '.' not in name]
     print(seq_names)
-    seq_names = ['2019_05_29_PM2S015', '2019_04_09_CMS1002', '2019_04_30_MLMS000', '2019_05_23_PM1S015', '2019_09_29_ONRD006', '2019_04_09_PMS1001']
 
     evalImgs_all = []
     n_frames_all = 0

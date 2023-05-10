@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import sys, os
+sys.path.append(os.path.abspath("."))
 
 from .backbones.MaxVIT2 import RadarStackedHourglass
 from .modules.mnet import MNet, MNetPlus
@@ -49,6 +51,15 @@ class MaxVIT2(nn.Module):
 
 
 if __name__ == '__main__':
-    testModel = MaxVIT2().cuda()
-    x = torch.zeros((1, 2, 16, 128, 128)).cuda()
-    testModel(x)
+    kwargs={
+        'in_channels': 4, 'n_class': 3, 'stacked_num': 1,
+        'mnet_cfg': (4, 32), 'dcn': False, 'win_size': 32,
+        'patch_size': 8, 'hidden_size': 1160,
+        'receptive_field': [[3, 5, 7, 9], [3, 3, 3, 3]],
+        'out_head': 1, 'num_layers': 16
+    }
+    testModel = MaxVIT2(**kwargs).cuda().bfloat16()
+    x = torch.zeros((1, 2, 32, 4, 128, 128)).cuda().bfloat16()
+    print(x.shape)
+    out = testModel(x)
+    print(out.shape)
