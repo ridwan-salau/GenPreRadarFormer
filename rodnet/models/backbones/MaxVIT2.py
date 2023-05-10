@@ -4,9 +4,6 @@ import torch
 import torch.nn as nn
 from maxvit.maxvit import MaxViTBlock
 from monai.networks.blocks import  UnetrPrUpBlock
-from monai.networks.blocks.dynunet_block import UnetOutBlock
-from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
-from monai.networks.blocks.transformerblock import TransformerBlock
 import math
 from monai.utils import  optional_import
 
@@ -26,18 +23,18 @@ class RadarStackedHourglass(nn.Module):
 
         self.hourglass = []
         for i in range(stacked_num):
-            self.hourglass.append(nn.ModuleList([UNETR(
-                                                        in_channels=in_channels,
-                                                        out_channels=n_class,
-                                                        img_size=(win_size, 128, 128),
-                                                        feature_size=patch_size,
-                                                        hidden_size=hidden_size,
-                                                        out_head = out_head,
-                                                        num_layers=num_layers,
-                                                        receptive_field = receptive_field,
-                                                        pos_embed='perceptron',
-                                                    ),
-                                                 ]))        
+            self.hourglass.append(UNETR(
+                                    in_channels=in_channels,
+                                    out_channels=n_class,
+                                    img_size=(win_size, 128, 128),
+                                    feature_size=patch_size,
+                                    hidden_size=hidden_size,
+                                    out_head = out_head,
+                                    num_layers=num_layers,
+                                    receptive_field = receptive_field,
+                                    pos_embed='perceptron',
+                                )
+                            )        
 
         self.hourglass = nn.ModuleList(self.hourglass)
         self.sigmoid = nn.Sigmoid()
@@ -46,7 +43,7 @@ class RadarStackedHourglass(nn.Module):
 
 
     def forward(self, x):
-        confmap = self.hourglass[0][0](x)
+        confmap = self.hourglass[0](x)
         if not self.use_mse_loss:
                 confmap = self.sigmoid(confmap)
         return confmap
@@ -270,38 +267,38 @@ class UNETR(nn.Module):
             norm_layer_transformer = nn.LayerNorm
     )
 
-        self.vit2 = MaxViTBlock(in_channels = feature_size * 2,
-            out_channels= feature_size * 2,
-            downscale = False,
-            num_heads = (feature_size*2)//2,
-            grid_window_size = (self.patch_size[0], self.patch_size[0]),
-            mlp_ratio = hidden_size//((feature_size*2)//2),
-            act_layer = nn.GELU,
-            norm_layer = nn.BatchNorm2d,
-            norm_layer_transformer = nn.LayerNorm
-    )
+    #     self.vit2 = MaxViTBlock(in_channels = feature_size * 2,
+    #         out_channels= feature_size * 2,
+    #         downscale = False,
+    #         num_heads = (feature_size*2)//2,
+    #         grid_window_size = (self.patch_size[0], self.patch_size[0]),
+    #         mlp_ratio = hidden_size//((feature_size*2)//2),
+    #         act_layer = nn.GELU,
+    #         norm_layer = nn.BatchNorm2d,
+    #         norm_layer_transformer = nn.LayerNorm
+    # )
 
-        self.vit3 = MaxViTBlock(in_channels = feature_size * 4,
-            out_channels= feature_size * 4,
-            downscale = False,
-            num_heads = (feature_size*4)//2,
-            grid_window_size = (self.patch_size[0], self.patch_size[0]),
-            mlp_ratio = hidden_size//((feature_size * 4)//2),
-            act_layer = nn.GELU,
-            norm_layer = nn.BatchNorm2d,
-            norm_layer_transformer = nn.LayerNorm
-    )
+    #     self.vit3 = MaxViTBlock(in_channels = feature_size * 4,
+    #         out_channels= feature_size * 4,
+    #         downscale = False,
+    #         num_heads = (feature_size*4)//2,
+    #         grid_window_size = (self.patch_size[0], self.patch_size[0]),
+    #         mlp_ratio = hidden_size//((feature_size * 4)//2),
+    #         act_layer = nn.GELU,
+    #         norm_layer = nn.BatchNorm2d,
+    #         norm_layer_transformer = nn.LayerNorm
+    # )
 
-        self.vit4 = MaxViTBlock(in_channels = feature_size * 8 if (feature_size * 8) <=64 else 64,
-            out_channels= feature_size * 8 if (feature_size * 8) <=64 else 64,
-            downscale = False,
-            num_heads = (feature_size * 8 if (feature_size * 8) <=64 else 64)//2,
-            grid_window_size = (self.patch_size[0], self.patch_size[0]),
-            mlp_ratio = hidden_size//((feature_size * 8 if (feature_size * 8) <=64 else 64)//2),
-            act_layer = nn.GELU,
-            norm_layer = nn.BatchNorm2d,
-            norm_layer_transformer = nn.LayerNorm
-    )
+    #     self.vit4 = MaxViTBlock(in_channels = min(feature_size * 8, 64),
+    #         out_channels= min(feature_size * 8, 64),
+    #         downscale = False,
+    #         num_heads = (feature_size min(* 8, 64))//2,
+    #         grid_window_size = (self.patch_size[0], self.patch_size[0]),
+    #         mlp_ratio = hidden_size//((min(feature_size * 8, 64))//2),
+    #         act_layer = nn.GELU,
+    #         norm_layer = nn.BatchNorm2d,
+    #         norm_layer_transformer = nn.LayerNorm
+    # )
        
         k_3d = 1+img_size[0]//7 
         self.encoder11 = nn.Conv3d(
@@ -329,33 +326,33 @@ class UNETR(nn.Module):
         self.bn13 = nn.BatchNorm3d(in_channels*3)
         self.relu = nn.ReLU()
 
-        self.res1_decoder3 = SingleConv(kernal_size = self.rf[0][0], in_channels = in_channels*3,
-                                        window_size = img_size[0], out_channels= in_channels*3, stride = 1)
+        # self.res1_decoder3 = SingleConv(kernal_size = self.rf[0][0], in_channels = in_channels*3,
+        #                                 window_size = img_size[0], out_channels= in_channels*3, stride = 1)
 
-        self.res1_decoder4 = SingleConv(kernal_size = self.rf[0][0], in_channels = in_channels*3,
-                                        window_size = img_size[0], out_channels= feature_size*2, stride = 1)
+        # self.res1_decoder4 = SingleConv(kernal_size = self.rf[0][0], in_channels = in_channels*3,
+        #                                 window_size = img_size[0], out_channels= feature_size*2, stride = 1)
 
-        self.res2_decoder3 = SingleConv(kernal_size = self.rf[0][1], in_channels = feature_size * 2,
-                                        window_size = img_size[0], out_channels= feature_size * 2, stride = 1)
-        self.res2_decoder4 = SingleConv(kernal_size = self.rf[0][1], in_channels = feature_size *2,
-                                        window_size = img_size[0], out_channels= feature_size*4, stride = 1)
+        # self.res2_decoder3 = SingleConv(kernal_size = self.rf[0][1], in_channels = feature_size * 2,
+        #                                 window_size = img_size[0], out_channels= feature_size * 2, stride = 1)
+        # self.res2_decoder4 = SingleConv(kernal_size = self.rf[0][1], in_channels = feature_size *2,
+        #                                 window_size = img_size[0], out_channels= feature_size*4, stride = 1)
 
 
 
-        self.res3_decoder3 = SingleConv(kernal_size = self.rf[0][2], in_channels = feature_size * 4,
-                                        window_size = img_size[0], out_channels= feature_size * 4, stride = 1)
-        self.res3_decoder4 = SingleConv(kernal_size = self.rf[0][2], in_channels = feature_size *4,
-                                        window_size = img_size[0], out_channels= feature_size * 8 if (feature_size * 8) <=64 else 64, stride = 1)
+        # self.res3_decoder3 = SingleConv(kernal_size = self.rf[0][2], in_channels = feature_size * 4,
+        #                                 window_size = img_size[0], out_channels= feature_size * 4, stride = 1)
+        # self.res3_decoder4 = SingleConv(kernal_size = self.rf[0][2], in_channels = feature_size *4,
+        #                                 window_size = img_size[0], out_channels= min(feature_size * 8, 64), stride = 1)
 
           
 
 
-        self.final_decoder1 = SingleConv(in_channels = feature_size * 8 if (feature_size * 8) <=64 else 64,
-                                        out_channels = feature_size * 8 if (feature_size * 8) <=64 else 64,
+        self.final_decoder1 = SingleConv(in_channels = 96, # min(feature_size * 8, 64),
+                                        out_channels = 96, # min(feature_size * 8, 64),
                                         kernal_size= self.rf[0][3],
                                         stride = 1,
                                         window_size = self.feat_size[0])
-        self.final_decoder2 = SingleConv(in_channels = feature_size * 8 if (feature_size * 8) <=64 else 64,
+        self.final_decoder2 = SingleConv(in_channels = 96, # min(feature_size * 8, 64),
                                         out_channels = in_channels * 3,
                                         kernal_size= self.rf[0][3],
                                         stride = 1,
@@ -387,10 +384,10 @@ class UNETR(nn.Module):
         
         self.out = nn.Conv3d(in_channels=in_channels, out_channels=self.out_channels, kernel_size = self.out_head,stride=1)  # type: ignore
 
-    def proj_feat(self, x, hidden_size, feat_size):
-        x = x.view(x.size(0), feat_size[0], feat_size[1], hidden_size)
-        x = x.permute(0, 3, 1, 2).contiguous()
-        return x
+    # def proj_feat(self, x, hidden_size, feat_size):
+    #     x = x.view(x.size(0), feat_size[0], feat_size[1], hidden_size)
+    #     x = x.permute(0, 3, 1, 2).contiguous()
+    #     return x
 
     # def get_memory_free_MiB(self, gpu_index):
     #     pynvml.nvmlInit()
@@ -404,17 +401,17 @@ class UNETR(nn.Module):
         x_in3 = self.relu(self.bn13(self.encoder13(x_in2)))
         x_in = torch.squeeze(x_in3, dim = 2)
         x = self.vit1(x_in)
-        x1 = self.res1_decoder3(x)
-        x1 = self.res1_decoder4(x1 + x_in)
-        x = self.vit2(x1)
-        x2 = self.res2_decoder3(x)
-        x2 = self.res2_decoder4(x2 + x1)
-        x = self.vit3(x2)
-        x3 = self.res3_decoder3(x)
-        x3 = self.res3_decoder4(x2 + x3)
-        x = self.vit4(x3)
+        # x1 = self.res1_decoder3(x)
+        # x1 = self.res1_decoder4(x1 + x_in)
+        # x = self.vit2(x1)
+        # x2 = self.res2_decoder3(x)
+        # x2 = self.res2_decoder4(x2 + x1)
+        # x = self.vit3(x2)
+        # x3 = self.res3_decoder3(x)
+        # x3 = self.res3_decoder4(x2 + x3)
+        # x = self.vit4(x3)
         x4 = self.final_decoder1(x)
-        x4 = self.final_decoder2(x4+x3)
+        x4 = self.final_decoder2(x4+x_in)
 
         x4 = torch.unsqueeze(x4,dim=2)
         
@@ -425,3 +422,5 @@ class UNETR(nn.Module):
         return out
 
 
+if __name__=="__main__":
+    unetr = UNETR()

@@ -25,5 +25,6 @@ rm -r train
 
 python ./RadarFormer/tools/prepare_dataset/prepare_data.py \
 --config ./RadarFormer/configs/config_rodnet_hg1v2_win16_mnet.py \
---data_root ./data_root0/ --split train,test --out_data_dir ./Pickle0
+--data_root /home/ridwan.salahuddeen/Documents/Second/ML703/Project/code/data/sequences/ \
+--split test --out_data_dir ./Pickle0
 

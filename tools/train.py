@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import random
 import sys
+from tqdm import tqdm
 sys.path.append(os.path.abspath("."))
 
 import torch
@@ -95,13 +96,13 @@ if __name__ == "__main__":
                             '2019_04_30_PCMS001.pkl', '2019_05_29_BCMS000.pkl', '2019_05_29_MLMS006.pkl', '2019_05_09_PCMS002.pkl', '2019_04_09_PMS3000.pkl', '2019_09_29_ONRD005.pkl', 
                             '2019_05_09_BM1S008.pkl', '2019_05_29_PBMS007.pkl', '2019_04_09_BMS1002.pkl', '2019_05_09_CM1S004.pkl', '2019_09_29_ONRD011.pkl', '2019_04_09_BMS1001.pkl']
     
-        train_subset = [x for x in list_train if x not in valid_subset]
+        train_subset = [x for x in list_train if x not in set(valid_subset)]
 
         print('Validation split is: %2d' %(len(valid_subset)))
         print('Train split is: %2d' %(len(train_subset)))
     else:
         print('all data will be used for training')
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
     # dataset = CRUW(data_root=config_dict['dataset_cfg']['base_root'])
     dataset = CRUW(data_root=config_dict['dataset_cfg']['base_root'], sensor_config_name=args.sensor_config)
     radar_configs = dataset.sensor_cfg.radar_cfg
@@ -197,17 +198,17 @@ if __name__ == "__main__":
                                     noise_channel=args.use_noise_channel, subset = train_subset, testing_state=0)
             seq_names = crdata_train.seq_names
             index_mapping = crdata_train.index_mapping
-            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=0, collate_fn=cr_collate)
+            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=8, collate_fn=cr_collate, pin_memory=True)
 
             crdata_valid = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
                                     noise_channel=args.use_noise_channel, subset = valid_subset, testing_state=0)
-            dataloader_valid = DataLoader(crdata_valid, batch_size, shuffle=False, num_workers=0, collate_fn=cr_collate)
+            dataloader_valid = DataLoader(crdata_valid, batch_size, shuffle=False, num_workers=8, collate_fn=cr_collate, pin_memory=True)
         else:
             crdata_train = CRDataset(data_dir=args.data_dir, dataset=dataset, config_dict=config_dict, split='train',
                                     noise_channel=args.use_noise_channel, testing_state=0)
             seq_names = crdata_train.seq_names
             index_mapping = crdata_train.index_mapping
-            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=0, collate_fn=cr_collate)            
+            dataloader = DataLoader(crdata_train, batch_size, shuffle=True, num_workers=20, collate_fn=cr_collate)            
         # crdata_valid = CRDataset(os.path.join(args.data_dir, 'data_details'),
         #                          os.path.join(args.data_dir, 'confmaps_gt'),
         #                          win_size=win_size, set_type='valid', stride=8)
@@ -336,7 +337,8 @@ if __name__ == "__main__":
                         hidden_size = config_dict['model_cfg']['hidden_size'], 
                         receptive_field = config_dict['model_cfg']['receptive_field'],
                         out_head = config_dict['model_cfg']['out_head'],
-                        num_layers = config_dict['model_cfg']['num_layers']).cuda()
+                        num_layers = config_dict['model_cfg']['num_layers'],
+                        mnet_plus_out_channels=None).cuda()
         criterion = nn.BCELoss()
     else:
         raise TypeError
@@ -358,7 +360,7 @@ if __name__ == "__main__":
     #scheduler = ReduceLROnPlateau(optimizer, mode = 'min', 
     #                             factor = 0.3, patience = 2, 
     #                             threshold = 1e-3, verbose = True)
-    print(rodnet)
+    # print(rodnet)
     iter_count = 0
     loss_ave = 0
     
@@ -391,7 +393,7 @@ if __name__ == "__main__":
     print("Number of iterations in each epoch: %d" % int(len(crdata_train) / batch_size))
     print('optimizer currently is: ',optimizer)
     print('Number of trainable parameters: %s' % str(count_params(rodnet)))
-    rodnet.bfloat16().cuda()
+    rodnet.cuda()
 
     start_time = time.time()
     
@@ -403,7 +405,7 @@ if __name__ == "__main__":
         # else:
         #     dataloader_start = 0
         
-        for iter, data_dict in enumerate(dataloader):
+        for iter, data_dict in enumerate(tqdm(dataloader)):
 
             data = data_dict['radar_data']
             confmap_gt = data_dict['anno']['confmaps']
@@ -417,22 +419,22 @@ if __name__ == "__main__":
 
             tic = time.time()
             optimizer.zero_grad()  # zero the parameter gradients
-            confmap_preds = rodnet(data.cuda().bfloat16())
+            confmap_preds = rodnet(data.cuda(non_blocking=True))
 
             loss_confmap = 0
             if stacked_num is not None:
                 if stacked_num != 1:
                     for i in range(stacked_num):
-                        loss_cur = criterion(confmap_preds[i], confmap_gt.bfloat16().cuda())
+                        loss_cur = criterion(confmap_preds[i], confmap_gt.float().cuda(non_blocking=True))
                         loss_confmap += loss_cur
                     loss_confmap.backward()
                     optimizer.step()
                 else:
-                    loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda())
+                    loss_confmap = criterion(confmap_preds, confmap_gt.float().cuda(non_blocking=True))
                     loss_confmap.backward()
                     optimizer.step()
             else:
-                loss_confmap = criterion(confmap_preds, confmap_gt.bfloat16().cuda())
+                loss_confmap = criterion(confmap_preds, confmap_gt.float().cuda(non_blocking=True))
                 loss_confmap.backward()
                 optimizer.step()
             tic_back = time.time()
@@ -526,13 +528,15 @@ if __name__ == "__main__":
                 f_log.write("\nBatch size: %d" % batch_size)
                 f_log.write("\nNumber of iterations in each epoch: %d" % int(len(crdata_valid) / batch_size))
             valid_loss_ave =0
-            for iter, data_dict in enumerate(dataloader_valid):
+            rodnet.eval()
+            for iter, data_dict in enumerate(tqdm(dataloader_valid)):
                     
                 data = data_dict['radar_data']
                 confmap_gt = data_dict['anno']['confmaps']  
                 image_paths = data_dict['image_paths']
-                valid_confmap_preds = rodnet(data.bfloat16().cuda())
-                valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.bfloat16().cuda())
+                with torch.no_grad():
+                    valid_confmap_preds = rodnet(data.cuda(non_blocking=True))
+                    valid_loss_confmap = criterion(valid_confmap_preds, confmap_gt.float().cuda(non_blocking=True))
                 valid_loss_ave = np.average([valid_loss_ave, valid_loss_confmap.item()], weights=[iter, 1])
                 
                 if iter % config_dict['train_cfg']['log_step'] == 0:
@@ -564,5 +568,6 @@ if __name__ == "__main__":
                     if iter == int(len(crdata_valid) / batch_size):
                         
                         f_log.write("\n-----End of Validation-----\n")
+            rodnet.train()
 
     print('Training Finished.')

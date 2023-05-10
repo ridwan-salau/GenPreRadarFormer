@@ -1,6 +1,7 @@
-import os
+import os, sys
 import argparse
 import numpy as np
+sys.path.append(os.path.abspath("."))
 
 from cruw import CRUW
 from cruw.eval import evaluate_rodnet_seq
@@ -32,6 +33,7 @@ if __name__ == '__main__':
 
     seq_names = sorted(os.listdir(args.res_dir))
     seq_names = [name for name in seq_names if '.' not in name]
+    print(seq_names)
 
     evalImgs_all = []
     n_frames_all = 0
@@ -40,7 +42,7 @@ if __name__ == '__main__':
         gt_path = os.path.join(args.gt_dir, seq_name.upper() + '.txt')
         res_path = os.path.join(args.res_dir, seq_name, 'rod_res.txt')
 
-        data_path = os.path.join(dataset.data_root, 'sequences', 'test', gt_path.split('/')[-1][:-4])
+        data_path = os.path.join(dataset.data_root, 'sequences', 'train', gt_path.split('/')[-1][:-4])
         n_frame = len(os.listdir(os.path.join(data_path, dataset.sensor_cfg.camera_cfg['image_folder'])))
 
         evalImgs = evaluate_rodnet_seq(res_path, gt_path, n_frame, dataset)
